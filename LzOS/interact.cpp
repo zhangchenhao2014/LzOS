@@ -77,6 +77,7 @@ void handleMemoryCommand(string cmd) {
     if(cmd == "/e") {
         string line;
         getline(cin, line);
+        if(!line.empty() && line.back() == '\r') line.pop_back();
         
         string md = "";
         string expr = "";
@@ -127,6 +128,7 @@ void findMemory() {
 void checkExpressionWithMemory() {
     string line;
     getline(cin, line);
+    if(!line.empty() && line.back() == '\r') line.pop_back();
     
     string currentMode = "";
     string expression = "";
@@ -334,6 +336,7 @@ string substituteVariables(const string& expr) {
 void handleVarCommand() {
     string rest;
     getline(cin, rest);
+    if(!rest.empty() && rest.back() == '\r') rest.pop_back();
     size_t eqPos = rest.find('=');
     if(eqPos == string::npos) {
         cout << "错误：var指令格式应为 var 变量名 = 表达式\n";

@@ -649,6 +649,7 @@ bool isExpression(const string& str, string mode) {
 void checkExpression(){
     string line;
     getline(cin, line);
+    if(!line.empty() && line.back() == '\r') line.pop_back();
     
     string mode = "";
     string expression = "";
