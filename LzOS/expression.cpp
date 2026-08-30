@@ -2,16 +2,27 @@
 #include "expression.h"
 using namespace std;
 
-unordered_map<char,int> precedence = {
+static unordered_map<char,int> arithmeticPrecedence = {
     {'+', 1},
     {'-', 1},
     {'*', 2},
     {'/', 2},
     {'^', 3}
 };
+
+static unordered_map<char,int> bitwisePrecedence = {
+    {'~', 5},
+    {'&', 4},
+    {'^', 3},
+    {'|', 2},
+    {'l', 1},
+    {'r', 1}
+};
+
 bool isRightAssociative(char op) {
-    return op == '^';
+    return op == '^' || op == 'l' || op == 'r';
 }
+
 long long qpow(long long base, long long exp) {
     long long result = 1;
     while (exp > 0) {
@@ -21,6 +32,7 @@ long long qpow(long long base, long long exp) {
     }
     return result;
 }
+
 void evaluate(stack<double>& numbers, stack<char>& operators) {
     double right = numbers.top(); numbers.pop();
     double left = numbers.top(); numbers.pop();
@@ -31,15 +43,38 @@ void evaluate(stack<double>& numbers, stack<char>& operators) {
         case '-': result = left - right; break;
         case '*': result = left * right; break;
         case '/': 
-            if (right == 0) {
-                throw runtime_error("除数不能为0");
-            }
+            if (right == 0) throw runtime_error("除数不能为0");
             result = left / right; 
             break;
         case '^': result = pow(left, right); break;
     }
     numbers.push(result);
 }
+
+void evaluateBitwise(stack<double>& numbers, stack<char>& operators) {
+    if (operators.top() == '~') {
+        operators.pop();
+        double val = numbers.top(); numbers.pop();
+        long long lv = (long long)val;
+        numbers.push((double)(~lv));
+        return;
+    }
+    double right = numbers.top(); numbers.pop();
+    double left = numbers.top(); numbers.pop();
+    char op = operators.top(); operators.pop();
+    long long l = (long long)left;
+    long long r = (long long)right;
+    double result = 0;
+    switch (op) {
+        case '&': result = (double)(l & r); break;
+        case '|': result = (double)(l | r); break;
+        case '^': result = (double)(l ^ r); break;
+        case 'l': result = (double)(l << r); break;
+        case 'r': result = (double)(l >> r); break;
+    }
+    numbers.push(result);
+}
+
 void evaluateLogic(stack<double>& numbers, stack<char>& operators) {
     double right = numbers.top(); numbers.pop();
     double left = numbers.top(); numbers.pop();
@@ -57,11 +92,17 @@ void evaluateLogic(stack<double>& numbers, stack<char>& operators) {
     }
     numbers.push(result);
 }
+
 bool isOperator(char c) {
     return c == '+' || c == '-' || c == '*' || c == '/' || c == '^';
 }
+
 bool isLogicOperator(char c) {
     return c == '&' || c == '|' || c == '~' || c == '=' || c == '#' || c == 'G' || c == 'L' || c == '>' || c == '<';
+}
+
+bool isBitwiseOperator(char c) {
+    return c == '&' || c == '|' || c == '^' || c == '~' || c == 'l' || c == 'r';
 }
 
 double evaluateExpr(const string& expr, const string& mode) {
@@ -105,6 +146,19 @@ double evaluateExpr(const string& expr, const string& mode) {
         }
     }
     
+    if (mode == "bitwise") {
+        size_t pos = 0;
+        while ((pos = expression.find("<<", pos)) != string::npos) {
+            expression.replace(pos, 2, "l");
+            pos += 1;
+        }
+        pos = 0;
+        while ((pos = expression.find(">>", pos)) != string::npos) {
+            expression.replace(pos, 2, "r");
+            pos += 1;
+        }
+    }
+    
     stack<double> numbers;
     stack<char> operators;
     size_t i = 0;
@@ -120,6 +174,8 @@ double evaluateExpr(const string& expr, const string& mode) {
         {'&', 2},
         {'|', 1}
     };
+    
+    bool useBitwise = (mode == "bitwise");
     
     while (i < expression.length()) {
         char c = expression[i];
@@ -146,13 +202,13 @@ double evaluateExpr(const string& expr, const string& mode) {
             while (!operators.empty() && operators.top() != '(') {
                 if (mode == "tf" && isLogicOperator(operators.top())) {
                     evaluateLogic(numbers, operators);
+                } else if (useBitwise && isBitwiseOperator(operators.top())) {
+                    evaluateBitwise(numbers, operators);
                 } else {
                     evaluate(numbers, operators);
                 }
             }
-            if (operators.empty()) {
-                throw runtime_error("括号不匹配");
-            }
+            if (operators.empty()) throw runtime_error("括号不匹配");
             operators.pop();
             i++;
         }
@@ -163,14 +219,10 @@ double evaluateExpr(const string& expr, const string& mode) {
                                isLogicOperator(expression[i-1]) || 
                                isOperator(expression[i-1]);
                 
-                if (!isUnary) {
-                    throw runtime_error("逻辑非运算格式错误");
-                }
+                if (!isUnary) throw runtime_error("逻辑非运算格式错误");
                 
                 i++;
-                if (i >= expression.length()) {
-                    throw runtime_error("逻辑非运算缺少操作数");
-                }
+                if (i >= expression.length()) throw runtime_error("逻辑非运算缺少操作数");
                 char nextC = expression[i];
                 if (isdigit(nextC) || nextC == '.') {
                     string numStr;
@@ -226,6 +278,77 @@ double evaluateExpr(const string& expr, const string& mode) {
             operators.push(c);
             i++;
         }
+        else if (useBitwise && isBitwiseOperator(c)) {
+            if (c == '~') {
+                bool isUnary = (i == 0) || 
+                               (expression[i-1] == '(') || 
+                               isBitwiseOperator(expression[i-1]) ||
+                               isOperator(expression[i-1]);
+                
+                if (!isUnary) throw runtime_error("按位取反格式错误");
+                
+                i++;
+                if (i >= expression.length()) throw runtime_error("按位取反缺少操作数");
+                char nextC = expression[i];
+                if (isdigit(nextC) || nextC == '.') {
+                    string numStr;
+                    bool hasDot = false;
+                    while (i < expression.length() && (isdigit(expression[i]) || expression[i] == '.')) {
+                        if (expression[i] == '.') {
+                            if (hasDot) throw runtime_error("数字表达式错误：多个小数点");
+                            hasDot = true;
+                        }
+                        numStr += expression[i];
+                        i++;
+                    }
+                    long long val = (long long)stod(numStr);
+                    numbers.push((double)(~val));
+                    continue;
+                }
+                else if (nextC == '(') {
+                    int depth = 1;
+                    size_t start = i + 1;
+                    size_t end = i + 1;
+                    while (end < expression.length() && depth > 0) {
+                        if (expression[end] == '(') depth++;
+                        else if (expression[end] == ')') depth--;
+                        end++;
+                    }
+                    string innerExpr = expression.substr(start, end - start - 1);
+                    double val = evaluateExpr(innerExpr, mode);
+                    numbers.push((double)(~((long long)val)));
+                    i = end;
+                    continue;
+                }
+                else {
+                    throw runtime_error("按位取反缺少操作数");
+                }
+            }
+            
+            int currentPrecedence = bitwisePrecedence[c];
+            while (!operators.empty() && operators.top() != '(') {
+                char topOp = operators.top();
+                if (isBitwiseOperator(topOp)) {
+                    if (isRightAssociative(c)) {
+                        if (bitwisePrecedence[topOp] > currentPrecedence) {
+                            evaluateBitwise(numbers, operators);
+                        } else {
+                            break;
+                        }
+                    } else {
+                        if (bitwisePrecedence[topOp] >= currentPrecedence) {
+                            evaluateBitwise(numbers, operators);
+                        } else {
+                            break;
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+            operators.push(c);
+            i++;
+        }
         else if (c == '+' || c == '-' || c == '*' || c == '/' || c == '^') {
             if ((c == '-' || c == '+') && (i == 0 || expression[i-1] == '(' || isOperator(expression[i-1]))) {
                 numbers.push(0);
@@ -234,13 +357,13 @@ double evaluateExpr(const string& expr, const string& mode) {
             while (!operators.empty() && operators.top() != '(') {
                 char topOp = operators.top();
                 if (isRightAssociative(c)) {
-                    if (precedence[topOp] > precedence[c]) {
+                    if (arithmeticPrecedence[topOp] > arithmeticPrecedence[c]) {
                         evaluate(numbers, operators);
                     } else {
                         break;
                     }
                 } else {
-                    if (precedence[topOp] >= precedence[c]) {
+                    if (arithmeticPrecedence[topOp] >= arithmeticPrecedence[c]) {
                         evaluate(numbers, operators);
                     } else {
                         break;
@@ -261,15 +384,14 @@ double evaluateExpr(const string& expr, const string& mode) {
         }
         if (mode == "tf" && isLogicOperator(operators.top())) {
             evaluateLogic(numbers, operators);
+        } else if (useBitwise && isBitwiseOperator(operators.top())) {
+            evaluateBitwise(numbers, operators);
         } else {
             evaluate(numbers, operators);
         }
     }
     
-    if (numbers.empty()) {
-        return 0;
-    }
-    
+    if (numbers.empty()) return 0;
     return numbers.top();
 }
 
@@ -302,6 +424,7 @@ bool isExpression(const string& str, string mode) {
     stack<char> parentheses;
     bool hasOperand = false;
     bool expectOperand = true;
+    bool isBitwiseMode = (mode == "bitwise");
     
     for (size_t i = 0; i < str.length(); i++) {
         char c = str[i];
@@ -316,6 +439,16 @@ bool isExpression(const string& str, string mode) {
             i--;
         }
         else if (mode == "tf" && (c == '&' || c == '|' || c == '=' || c == '>' || c == '<' || c == '#' || c == '~' || c == 'G' || c == 'L')) {
+            if (c == '~') {
+                if (!expectOperand) return false;
+                expectOperand = true;
+                continue;
+            }
+            if (expectOperand) return false;
+            hasOperand = true;
+            expectOperand = true;
+        }
+        else if (isBitwiseMode && (c == '&' || c == '|' || c == '^' || c == '~' || c == 'l' || c == 'r')) {
             if (c == '~') {
                 if (!expectOperand) return false;
                 expectOperand = true;
@@ -384,6 +517,10 @@ void checkExpression(){
         mode = "tf";
         startIdx = 1;
     }
+    else if(!args.empty() && args[0] == "bw"){
+        mode = "bitwise";
+        startIdx = 1;
+    }
     
     for(size_t i = startIdx; i < args.size(); i++){
         if(i > startIdx) expression += " ";
@@ -424,6 +561,18 @@ void checkExpression(){
         pos = 0;
         while((pos = checkExpr.find("!", pos)) != string::npos){
             checkExpr.replace(pos, 1, "~");
+            pos += 1;
+        }
+    }
+    else if(mode == "bitwise"){
+        size_t pos = 0;
+        while((pos = checkExpr.find("<<", pos)) != string::npos){
+            checkExpr.replace(pos, 2, "l");
+            pos += 1;
+        }
+        pos = 0;
+        while((pos = checkExpr.find(">>", pos)) != string::npos){
+            checkExpr.replace(pos, 2, "r");
             pos += 1;
         }
     }

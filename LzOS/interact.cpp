@@ -90,6 +90,10 @@ void handleMemoryCommand(string cmd) {
             md = "tf";
             startIdx = 1;
         }
+        else if(!args.empty() && args[0] == "bw") {
+            md = "bitwise";
+            startIdx = 1;
+        }
         
         for(size_t i = startIdx; i < args.size(); i++) {
             if(i > startIdx) expr += " ";
@@ -138,6 +142,10 @@ void checkExpressionWithMemory() {
     
     if(!args.empty() && args[0] == "tf") {
         currentMode = "tf";
+        startIdx = 1;
+    }
+    else if(!args.empty() && args[0] == "bw") {
+        currentMode = "bitwise";
         startIdx = 1;
     }
     
@@ -189,6 +197,18 @@ void checkExpressionWithMemory() {
                 pos += 1;
             }
         }
+        else if(md == "bitwise") {
+            size_t pos = 0;
+            while((pos = checkExpr.find("<<", pos)) != string::npos) {
+                checkExpr.replace(pos, 2, "l");
+                pos += 1;
+            }
+            pos = 0;
+            while((pos = checkExpr.find(">>", pos)) != string::npos) {
+                checkExpr.replace(pos, 2, "r");
+                pos += 1;
+            }
+        }
         
         if(expression.empty() || !isExpression(checkExpr, md)) {
             cout << "错误：数字表达式或逻辑表达式有问题\n";
@@ -234,6 +254,18 @@ void checkExpressionWithMemory() {
         pos = 0;
         while((pos = checkExpr.find("!", pos)) != string::npos) {
             checkExpr.replace(pos, 1, "~");
+            pos += 1;
+        }
+    }
+    else if(currentMode == "bitwise") {
+        size_t pos = 0;
+        while((pos = checkExpr.find("<<", pos)) != string::npos) {
+            checkExpr.replace(pos, 2, "l");
+            pos += 1;
+        }
+        pos = 0;
+        while((pos = checkExpr.find(">>", pos)) != string::npos) {
+            checkExpr.replace(pos, 2, "r");
             pos += 1;
         }
     }
