@@ -75,30 +75,26 @@ void executeCommand(string cmd, string md) {
 
 void handleMemoryCommand(string cmd) {
     if(cmd == "/e") {
-        vector<string> args;
-        string arg;
-        while(cin >> arg) {
-            args.push_back(arg);
-            if(cin.peek() == '\n' || cin.peek() == '\r') break;
-        }
+        string line;
+        getline(cin, line);
         
         string md = "";
         string expr = "";
-        size_t startIdx = 0;
+        size_t pos = 0;
         
-        if(!args.empty() && args[0] == "tf") {
+        while (pos < line.size() && isspace(line[pos])) pos++;
+        
+        if(pos < line.size() && line.substr(pos, 2) == "tf") {
             md = "tf";
-            startIdx = 1;
+            pos += 2;
         }
-        else if(!args.empty() && args[0] == "bw") {
+        else if(pos < line.size() && line.substr(pos, 2) == "bw") {
             md = "bitwise";
-            startIdx = 1;
+            pos += 2;
         }
         
-        for(size_t i = startIdx; i < args.size(); i++) {
-            if(i > startIdx) expr += " ";
-            expr += args[i];
-        }
+        while (pos < line.size() && isspace(line[pos])) pos++;
+        expr = line.substr(pos);
         
         s = expr;
         mode = md;
@@ -129,30 +125,26 @@ void findMemory() {
 }
 
 void checkExpressionWithMemory() {
-    vector<string> args;
-    string arg;
-    while(cin >> arg) {
-        args.push_back(arg);
-        if(cin.peek() == '\n' || cin.peek() == '\r') break;
-    }
+    string line;
+    getline(cin, line);
     
     string currentMode = "";
     string expression = "";
-    size_t startIdx = 0;
+    size_t pos = 0;
     
-    if(!args.empty() && args[0] == "tf") {
+    while (pos < line.size() && isspace(line[pos])) pos++;
+    
+    if(pos < line.size() && line.substr(pos, 2) == "tf") {
         currentMode = "tf";
-        startIdx = 1;
+        pos += 2;
     }
-    else if(!args.empty() && args[0] == "bw") {
+    else if(pos < line.size() && line.substr(pos, 2) == "bw") {
         currentMode = "bitwise";
-        startIdx = 1;
+        pos += 2;
     }
     
-    for(size_t i = startIdx; i < args.size(); i++) {
-        if(i > startIdx) expression += " ";
-        expression += args[i];
-    }
+    while (pos < line.size() && isspace(line[pos])) pos++;
+    expression = line.substr(pos);
     
     s = expression;
     mode = currentMode;

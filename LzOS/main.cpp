@@ -43,10 +43,13 @@ int main(int argc, char** argv) {
         }
         else {
             if(hasMemory && rememberedOp == "/e") {
+                string line;
+                getline(cin, line);
                 string expr = op;
-                string arg;
-                while(cin.peek() != '\n' && cin.peek() != '\r' && cin >> arg) {
-                    expr += " " + arg;
+                size_t p = 0;
+                while (p < line.size() && isspace(line[p])) p++;
+                if (p < line.size()) {
+                    expr += " " + line.substr(p);
                 }
                 s = expr;
                 handle(expr, rememberedMode);

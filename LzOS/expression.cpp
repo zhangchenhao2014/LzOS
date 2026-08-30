@@ -3,6 +3,71 @@
 #include "interact.h"
 using namespace std;
 
+static unordered_map<string, int> mathFunctions = {
+    {"sqrt", 1},
+    {"abs", 1},
+    {"log", 1},
+    {"log10", 1},
+    {"log2", 1},
+    {"sin", 1},
+    {"cos", 1},
+    {"tan", 1},
+    {"asin", 1},
+    {"acos", 1},
+    {"atan", 1},
+    {"ceil", 1},
+    {"floor", 1},
+    {"round", 1},
+    {"exp", 1},
+    {"pow", 2},
+    {"max", 2},
+    {"min", 2},
+    {"cbrt", 1},
+    {"hypot", 2}
+};
+
+double applyMathFunction(const string& name, const vector<double>& args) {
+    if(name == "sqrt") {
+        if(args[0] < 0) throw runtime_error("sqrt参数不能为负数");
+        return sqrt(args[0]);
+    }
+    if(name == "abs") return abs(args[0]);
+    if(name == "log") {
+        if(args[0] <= 0) throw runtime_error("log参数必须为正数");
+        return log(args[0]);
+    }
+    if(name == "log10") {
+        if(args[0] <= 0) throw runtime_error("log10参数必须为正数");
+        return log10(args[0]);
+    }
+    if(name == "log2") {
+        if(args[0] <= 0) throw runtime_error("log2参数必须为正数");
+        return log2(args[0]);
+    }
+    if(name == "sin") return sin(args[0]);
+    if(name == "cos") return cos(args[0]);
+    if(name == "tan") return tan(args[0]);
+    if(name == "asin") {
+        if(args[0] < -1 || args[0] > 1) throw runtime_error("asin参数必须在[-1,1]范围内");
+        return asin(args[0]);
+    }
+    if(name == "acos") {
+        if(args[0] < -1 || args[0] > 1) throw runtime_error("acos参数必须在[-1,1]范围内");
+        return acos(args[0]);
+    }
+    if(name == "atan") return atan(args[0]);
+    if(name == "ceil") return ceil(args[0]);
+    if(name == "floor") return floor(args[0]);
+    if(name == "round") return round(args[0]);
+    if(name == "exp") return exp(args[0]);
+    if(name == "pow") return pow(args[0], args[1]);
+    if(name == "max") return max(args[0], args[1]);
+    if(name == "min") return min(args[0], args[1]);
+    if(name == "cbrt") return cbrt(args[0]);
+    if(name == "hypot") return hypot(args[0], args[1]);
+    throw runtime_error("未知函数: " + name);
+}
+
 static unordered_map<char,int> arithmeticPrecedence = {
     {'+', 1},
     {'-', 1},
@@ -194,6 +259,65 @@ double evaluateExpr(const string& expr, const string& mode) {
             }
             numbers.push(stod(numStr));
             continue;
+        }
+        else if (isalpha(c)) {
+            string funcName;
+            while (i < expression.length() && (isalpha(expression[i]) || isdigit(expression[i]))) {
+                funcName += expression[i];
+                i++;
+            }
+            if (mathFunctions.count(funcName)) {
+                if (i >= expression.length() || expression[i] != '(') {
+                    throw runtime_error("函数 " + funcName + " 缺少括号");
+                }
+                i++;
+                
+                vector<string> paramStrs;
+                int depth = 1;
+                string currentParam;
+                while (i < expression.length() && depth > 0) {
+                    if (expression[i] == '(') {
+                        depth++;
+                        currentParam += expression[i];
+                    }
+                    else if (expression[i] == ')') {
+                        depth--;
+                        if (depth > 0) currentParam += expression[i];
+                    }
+                    else if (expression[i] == ',' && depth == 1) {
+                        paramStrs.push_back(currentParam);
+                        currentParam = "";
+                    }
+                    else {
+                        currentParam += expression[i];
+                    }
+                    i++;
+                }
+                if (depth != 0) throw runtime_error("函数 " + funcName + " 括号不匹配");
+                paramStrs.push_back(currentParam);
+                
+                int expectedArgs = mathFunctions[funcName];
+                if ((int)paramStrs.size() != expectedArgs) {
+                    throw runtime_error("函数 " + funcName + " 需要 " + to_string(expectedArgs) + " 个参数");
+                }
+                
+                vector<double> args;
+                for (auto& ps : paramStrs) {
+                    string resolved = substituteVariables(ps);
+                    double val = evaluateExpr(resolved, mode);
+                    args.push_back(val);
+                }
+                
+                numbers.push(applyMathFunction(funcName, args));
+                continue;
+            }
+            else if (mode == "tf" && (funcName == "true" || funcName == "false")) {
+                numbers.push(funcName == "true" ? 1.0 : 0.0);
+                continue;
+            }
+            else {
+                throw runtime_error("未知标识符: " + funcName);
+            }
         }
         else if (c == '(') {
             operators.push(c);
@@ -461,19 +585,33 @@ bool isExpression(const string& str, string mode) {
             expectOperand = true;
         }
         else if (isalpha(c)) {
-            if (mode == "tf") {
-                string word;
-                size_t j = i;
-                while (j < str.length() && isalpha(str[j])) {
-                    word += str[j];
-                    j++;
+            string word;
+            size_t j = i;
+            while (j < str.length() && (isalpha(str[j]) || isdigit(str[j]))) {
+                word += str[j];
+                j++;
+            }
+            if (mathFunctions.count(word)) {
+                hasOperand = true;
+                expectOperand = false;
+                if (j >= str.length() || str[j] != '(') return false;
+                int depth = 1;
+                size_t k = j + 1;
+                while (k < str.length() && depth > 0) {
+                    if (str[k] == '(') depth++;
+                    else if (str[k] == ')') depth--;
+                    if (depth == 0) break;
+                    k++;
                 }
-                if (word == "true" || word == "false") {
-                    hasOperand = true;
-                    expectOperand = false;
-                    i = j - 1;
-                    continue;
-                }
+                if (depth != 0) return false;
+                i = k;
+                continue;
+            }
+            if (mode == "tf" && (word == "true" || word == "false")) {
+                hasOperand = true;
+                expectOperand = false;
+                i = j - 1;
+                continue;
             }
             return false;
         }
@@ -495,6 +633,11 @@ bool isExpression(const string& str, string mode) {
             hasOperand = true;
             expectOperand = true;
         }
+        else if (c == ',') {
+            if (expectOperand) return false;
+            expectOperand = true;
+            hasOperand = true;
+        }
         else {
             return false;
         }
@@ -504,30 +647,27 @@ bool isExpression(const string& str, string mode) {
 }
 
 void checkExpression(){
-    vector<string> args;
-    string arg;
-    while(cin >> arg){
-        args.push_back(arg);
-        if(cin.peek() == '\n' || cin.peek() == '\r') break;
-    }
+    string line;
+    getline(cin, line);
     
     string mode = "";
     string expression = "";
-    size_t startIdx = 0;
+    size_t pos = 0;
     
-    if(!args.empty() && args[0] == "tf"){
+    while (pos < line.size() && isspace(line[pos])) pos++;
+    
+    if(pos < line.size() && line.substr(pos, 2) == "tf") {
         mode = "tf";
-        startIdx = 1;
+        pos += 2;
     }
-    else if(!args.empty() && args[0] == "bw"){
+    else if(pos < line.size() && line.substr(pos, 2) == "bw") {
         mode = "bitwise";
-        startIdx = 1;
+        pos += 2;
     }
     
-    for(size_t i = startIdx; i < args.size(); i++){
-        if(i > startIdx) expression += " ";
-        expression += args[i];
-    }
+    while (pos < line.size() && isspace(line[pos])) pos++;
+    expression = line.substr(pos);
+    
     string checkExpr = expression;
     if(mode == "tf"){
         size_t pos = 0;
