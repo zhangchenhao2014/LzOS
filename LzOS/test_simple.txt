@@ -1,3 +1,0 @@
-/e sqrt(16)
-exit
-y

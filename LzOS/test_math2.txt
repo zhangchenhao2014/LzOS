@@ -1,6 +1,0 @@
-/e log10(100)
-/e pow(2,10)
-/e max(3,7)
-/e min(3,7)
-exit
-y
