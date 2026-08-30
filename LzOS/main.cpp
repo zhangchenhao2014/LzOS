@@ -7,6 +7,7 @@ string op, s, mode;
 string rememberedOp = "";
 string rememberedMode = "";
 bool hasMemory = false;
+unordered_map<string, string> variables;
 
 int main(int argc, char** argv) {
     init();
@@ -20,6 +21,9 @@ int main(int argc, char** argv) {
             string cmd;
             cin >> cmd;
             handleMemoryCommand(cmd);
+        }
+        else if(op == "var") {
+            handleVarCommand();
         }
         else if(op == "clear") {
             clear_os();

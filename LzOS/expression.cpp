@@ -1,5 +1,6 @@
 #include<bits/stdc++.h>
 #include "expression.h"
+#include "interact.h"
 using namespace std;
 
 static unordered_map<char,int> arithmeticPrecedence = {
@@ -397,7 +398,8 @@ double evaluateExpr(const string& expr, const string& mode) {
 
 void handle(string expression, string mode) {
     try {
-        double result = evaluateExpr(expression, mode);
+        string resolved = substituteVariables(expression);
+        double result = evaluateExpr(resolved, mode);
         
         if (mode == "tf") {
             if (result == 0) {

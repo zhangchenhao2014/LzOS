@@ -159,7 +159,8 @@ void checkExpressionWithMemory() {
     
     if(hasMemory && rememberedOp == "/e") {
         string md = rememberedMode;
-        string checkExpr = expression;
+        string resolvedExpr = substituteVariables(expression);
+        string checkExpr = resolvedExpr;
         if(md == "tf") {
             size_t pos = 0;
             while((pos = checkExpr.find("&&", pos)) != string::npos) {
@@ -210,7 +211,7 @@ void checkExpressionWithMemory() {
             }
         }
         
-        if(expression.empty() || !isExpression(checkExpr, md)) {
+        if(resolvedExpr.empty() || !isExpression(checkExpr, md)) {
             cout << "错误：数字表达式或逻辑表达式有问题\n";
             return;
         }
@@ -219,7 +220,8 @@ void checkExpressionWithMemory() {
         return;
     }
     
-    string checkExpr = expression;
+    string resolvedExpr = substituteVariables(expression);
+    string checkExpr = resolvedExpr;
     if(currentMode == "tf") {
         size_t pos = 0;
         while((pos = checkExpr.find("&&", pos)) != string::npos) {
@@ -270,7 +272,7 @@ void checkExpressionWithMemory() {
         }
     }
     
-    if(expression.empty() || !isExpression(checkExpr, currentMode)) {
+    if(resolvedExpr.empty() || !isExpression(checkExpr, currentMode)) {
         cout << "错误：数字表达式或逻辑表达式有问题\n";
         return;
     }
@@ -288,8 +290,144 @@ void handleCheckCommand(string param) {
         } else {
             cout << "没有记忆\n";
         }
+    } else if(param == "var") {
+        if(variables.empty()) {
+            cout << "没有存储的变量\n";
+        } else {
+            cout << "存储的变量:\n";
+            for(auto& p : variables) {
+                cout << "  " << p.first << " = " << p.second << "\n";
+            }
+        }
     } else {
         cout << "未知参数: " << param << "\n";
-        cout << "合法参数: mr\n";
+        cout << "合法参数: mr, var\n";
     }
+}
+
+bool isValidVarName(const string& name) {
+    if(name.empty()) return false;
+    if(!isalpha(name[0])) return false;
+    for(char c : name) {
+        if(!isalnum(c)) return false;
+    }
+    return true;
+}
+
+string substituteVariables(const string& expr) {
+    string result = expr;
+    bool changed = true;
+    int iterations = 0;
+    while(changed && iterations < 100) {
+        changed = false;
+        iterations++;
+        for(auto& p : variables) {
+            size_t pos = 0;
+            while((pos = result.find(p.first, pos)) != string::npos) {
+                bool leftOk = (pos == 0) || !isalnum(result[pos-1]);
+                size_t endPos = pos + p.first.size();
+                bool rightOk = (endPos >= result.size()) || !isalnum(result[endPos]);
+                if(leftOk && rightOk) {
+                    result.replace(pos, p.first.size(), p.second);
+                    changed = true;
+                } else {
+                    pos++;
+                }
+            }
+        }
+    }
+    return result;
+}
+
+void handleVarCommand() {
+    string rest;
+    getline(cin, rest);
+    size_t eqPos = rest.find('=');
+    if(eqPos == string::npos) {
+        cout << "错误：var指令格式应为 var 变量名 = 表达式\n";
+        return;
+    }
+    string varName = rest.substr(0, eqPos);
+    string expr = rest.substr(eqPos + 1);
+    
+    size_t start = 0;
+    while(start < varName.size() && varName[start] == ' ') start++;
+    size_t end = varName.size() - 1;
+    while(end >= start && varName[end] == ' ') end--;
+    varName = varName.substr(start, end - start + 1);
+    
+    size_t estart = 0;
+    while(estart < expr.size() && expr[estart] == ' ') estart++;
+    size_t eend = expr.size() - 1;
+    while(eend >= estart && expr[eend] == ' ') eend--;
+    expr = expr.substr(estart, eend - estart + 1);
+    
+    if(!isValidVarName(varName)) {
+        cout << "错误：变量名必须以字母开头，只能包含字母和数字\n";
+        return;
+    }
+    
+    string resolved = substituteVariables(expr);
+    
+    string checkExpr = resolved;
+    size_t pos = 0;
+    while((pos = checkExpr.find("&&", pos)) != string::npos) {
+        checkExpr.replace(pos, 2, "&");
+        pos += 1;
+    }
+    pos = 0;
+    while((pos = checkExpr.find("||", pos)) != string::npos) {
+        checkExpr.replace(pos, 2, "|");
+        pos += 1;
+    }
+    pos = 0;
+    while((pos = checkExpr.find("==", pos)) != string::npos) {
+        checkExpr.replace(pos, 2, "=");
+        pos += 1;
+    }
+    pos = 0;
+    while((pos = checkExpr.find("!=", pos)) != string::npos) {
+        checkExpr.replace(pos, 2, "#");
+        pos += 1;
+    }
+    pos = 0;
+    while((pos = checkExpr.find(">=", pos)) != string::npos) {
+        checkExpr.replace(pos, 2, "G");
+        pos += 1;
+    }
+    pos = 0;
+    while((pos = checkExpr.find("<=", pos)) != string::npos) {
+        checkExpr.replace(pos, 2, "L");
+        pos += 1;
+    }
+    pos = 0;
+    while((pos = checkExpr.find("!", pos)) != string::npos) {
+        checkExpr.replace(pos, 1, "~");
+        pos += 1;
+    }
+    pos = 0;
+    while((pos = checkExpr.find("<<", pos)) != string::npos) {
+        checkExpr.replace(pos, 2, "l");
+        pos += 1;
+    }
+    pos = 0;
+    while((pos = checkExpr.find(">>", pos)) != string::npos) {
+        checkExpr.replace(pos, 2, "r");
+        pos += 1;
+    }
+    
+    if(!isExpression(checkExpr, "")) {
+        cout << "错误：表达式有问题，无法存储变量\n";
+        return;
+    }
+    
+    double val = evaluateExpr(resolved, "");
+    string result;
+    if(val == (long long)val) {
+        result = to_string((long long)val);
+    } else {
+        result = to_string(val);
+    }
+    variables[varName] = result;
+    cout << "已存储变量: " << varName << " = " << result << "\n";
 }
