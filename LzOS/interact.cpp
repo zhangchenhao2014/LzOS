@@ -2,12 +2,19 @@
 #include "expression.h"
 using namespace std;
 
+extern "C" {
+    int __stdcall SetConsoleOutputCP(unsigned int wCodePageID);
+    int __stdcall SetConsoleCP(unsigned int wCodePageID);
+}
+
 extern string op, s, mode;
 extern string rememberedOp;
 extern string rememberedMode;
 extern bool hasMemory;
 
 void init() {
+    SetConsoleOutputCP(65001);
+    SetConsoleCP(65001);
     cout << "LzOS v1.0\n";
     cout << "LzOS启动成功\n";
 }
